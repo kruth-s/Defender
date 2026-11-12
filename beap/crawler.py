@@ -136,53 +136,62 @@ class BrowserProbe:
             pass
         return False
 
-    def probe_url(self, url: str, test_reflection: bool = False) -> PageProbeResult:
+    def probe_url(self, url: str, test_reflection: bool = False, max_redirects: int = 5) -> PageProbeResult:
         """
         Executes HTTP request, fetches headers, HTML, cookies, and TLS certificate.
-        Enforces SSRF boundary checks on both target and redirect chain.
+        Enforces hop-by-hop SSRF boundary checks BEFORE connecting to any hop.
         """
-        # SSRF Pre-flight Check
-        is_safe, reason = is_safe_target_url(url)
-        if not is_safe:
-            return PageProbeResult(
-                url=url,
-                status_code=0,
-                error_message=reason,
-                ssrf_blocked=True
-            )
-
-        parsed = urlparse(url)
-        scheme = parsed.scheme.lower() or "http"
-        hostname = parsed.hostname or ""
+        current_url = url
+        redirect_chain = [current_url]
+        last_resp = None
 
         try:
-            resp = self.session.get(
-                url,
-                timeout=self.timeout,
-                allow_redirects=True,
-                verify=False
-            )
-
-            # Validate redirect chain for SSRF
-            redirect_chain = [r.url for r in resp.history] + [resp.url]
-            for hop in redirect_chain:
-                hop_safe, hop_reason = is_safe_target_url(hop)
-                if not hop_safe:
+            for hop_idx in range(max_redirects + 1):
+                # SSRF Pre-flight Check on this specific hop BEFORE connecting
+                is_safe, reason = is_safe_target_url(current_url)
+                if not is_safe:
                     return PageProbeResult(
                         url=url,
+                        final_url=current_url,
                         status_code=0,
-                        error_message=f"SSRF Protection blocked redirect hop: {hop_reason}",
-                        ssrf_blocked=True
+                        error_message=f"SSRF Protection blocked connection: {reason}",
+                        ssrf_blocked=True,
+                        redirect_history=redirect_chain
                     )
+
+                resp = self.session.get(
+                    current_url,
+                    timeout=self.timeout,
+                    allow_redirects=False,
+                    verify=False
+                )
+                last_resp = resp
+
+                if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
+                    location = resp.headers.get("Location")
+                    if not location:
+                        break
+                    next_url = urljoin(current_url, location)
+                    redirect_chain.append(next_url)
+                    current_url = next_url
+                else:
+                    break
+
+            if last_resp is None:
+                return PageProbeResult(url=url, status_code=0, error_message="No response received.")
+
+            final_parsed = urlparse(current_url)
+            final_scheme = final_parsed.scheme.lower() or "http"
+            final_hostname = final_parsed.hostname or ""
 
             # TLS probe if HTTPS
             tls_data = {"cert_valid": True, "longevity_days": 365.0, "issuer_name": ""}
-            if scheme == "https" and hostname:
-                tls_data = self.probe_tls_certificate(hostname, port=443)
+            if final_scheme == "https" and final_hostname:
+                tls_data = self.probe_tls_certificate(final_hostname, port=443)
 
             # Cookies
             cookie_list = []
-            for c in resp.cookies:
+            for c in last_resp.cookies:
                 cookie_list.append({
                     "name": c.name,
                     "secure": getattr(c, "secure", False),
@@ -192,14 +201,14 @@ class BrowserProbe:
 
             reflection_detected = False
             if test_reflection:
-                reflection_detected = self.test_reflection_probe(resp.url)
+                reflection_detected = self.test_reflection_probe(current_url)
 
             return PageProbeResult(
                 url=url,
-                final_url=resp.url,
-                status_code=resp.status_code,
-                headers=dict(resp.headers),
-                html_content=resp.text,
+                final_url=current_url,
+                status_code=last_resp.status_code,
+                headers=dict(last_resp.headers),
+                html_content=last_resp.text,
                 cookies=cookie_list,
                 tls_info=tls_data,
                 redirect_history=redirect_chain,
@@ -210,6 +219,8 @@ class BrowserProbe:
         except Exception as ex:
             return PageProbeResult(
                 url=url,
+                final_url=current_url,
                 status_code=0,
-                error_message=str(ex)
+                error_message=str(ex),
+                redirect_history=redirect_chain
             )

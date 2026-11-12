@@ -22,7 +22,11 @@ PROHIBITED_HOSTNAMES = {
 BLOCKED_SCHEMES = {"file", "gopher", "ftp", "tftp", "ldap", "dict"}
 
 
-def is_safe_target_url(url: str, timeout: float = 3.0) -> Tuple[bool, str]:
+def is_safe_target_url(
+    url: str,
+    timeout: float = 3.0,
+    fail_closed: bool = True
+) -> Tuple[bool, str]:
     """
     Validates whether a candidate URL is safe to probe over the network.
     Rejects:
@@ -30,6 +34,7 @@ def is_safe_target_url(url: str, timeout: float = 3.0) -> Tuple[bool, str]:
       - Localhost and loopback addresses
       - Private RFC 1918 / RFC 4193 subnets
       - Link-local and cloud metadata endpoints (169.254.169.254)
+      - Unresolvable hostnames when fail_closed=True (live deployment mode)
     """
     if not url:
         return False, "Empty URL provided."
@@ -39,7 +44,7 @@ def is_safe_target_url(url: str, timeout: float = 3.0) -> Tuple[bool, str]:
     except Exception as ex:
         return False, f"Malformed URL string: {ex}"
 
-    scheme = parsed.scheme.lower()
+    scheme = (parsed.scheme or "").lower()
     if scheme not in ["http", "https"]:
         return False, f"Blocked scheme: '{scheme}'. Only HTTP and HTTPS are permitted."
 
@@ -64,8 +69,10 @@ def is_safe_target_url(url: str, timeout: float = 3.0) -> Tuple[bool, str]:
                 sockaddr = item[4]
                 ip_str = sockaddr[0]
                 ip_addresses.append(ipaddress.ip_address(ip_str))
-        except (socket.gaierror, Exception):
-            # Resolution failure; offline or unresolvable
+        except (socket.gaierror, Exception) as ex:
+            if fail_closed:
+                return False, f"SSRF Protection: Hostname resolution failed ({ex}). Access denied in fail-closed mode."
+            # Fallback only when explicitly permitted for offline/synthetic testing
             return True, "Hostname unresolvable in offline/isolated environment (mock inspection permitted)."
 
     for ip_obj in ip_addresses:
@@ -81,4 +88,3 @@ def is_safe_target_url(url: str, timeout: float = 3.0) -> Tuple[bool, str]:
             return False, f"SSRF Protection: Blocked multicast address {ip_obj}."
 
     return True, "Target URL validated as safe for external observation."
-
