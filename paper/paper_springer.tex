@@ -1,0 +1,461 @@
+% Springer LNCS / SVProc Proceedings Format
+% Target: ICTCS 2026 (Springer LNNS)
+% Formatted to exactly 10 pages following Springer Guidelines
+
+\documentclass{llncs}
+
+\usepackage{graphicx}
+\usepackage{url}
+\def\UrlBreaks{\do\/\do-\do_}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+
+\begin{document}
+
+\title{Browser-Driven Evidence Augmentation and Selective Abstention for Explainable Phishing Website Detection}
+\titlerunning{Browser-Driven Evidence Augmentation for Phishing Detection}
+
+\author{Atreyaa AVS\inst{1}\thanks{Corresponding author: \email{atreyaaavs.btech23@rvu.edu.in}}, Kruthik S\inst{1}, C Athish Kiran Kumar\inst{1}, Ayushman Patel\inst{1}, \and Monesh N\inst{1}}
+\authorrunning{Atreyaa AVS et al.}
+
+\institute{RV University, Bengaluru, India\\
+\email{atreyaaavs.btech23@rvu.edu.in}}
+
+\maketitle
+
+\begin{abstract}
+Modern phishing attacks increasingly exploit client-side dynamic DOM manipulation, third-party authentication masquerading, and short-lived certificates to evade static URL and HTML detectors. Conversely, deep neural graph-fusion models require extensive GPU computation, incur high decision delays (200--400\,ms), and operate as uninterpretable black boxes. This paper introduces BEAP (Browser-informed Evidence Augmentation and selective Abstention for Phishing detection), a lightweight framework combining static lexical features with browser-observed dynamic transport and behavioral indicators. Operating within a strict Server-Side Request Forgery (SSRF) boundary, BEAP compiles 51 engineered features covering URL structure, sensitive DOM inputs, HTTP security headers, TLS certificate lifetimes, and cross-domain form destinations. Rather than forcing arbitrary classifications on ambiguous instances, BEAP couples a dual-threshold selective abstention policy ($\tau_{\text{low}}, \tau_{\text{high}}$) with epistemic conflict detection, deferring uncertain cases to security operations center (SOC) analysts alongside mathematically exact log-odds attributions. Evaluating BEAP on a benchmark of 2,400 samples across 1,379 unique domains under strict domain-disjoint splitting demonstrates 99.22\% accuracy (ROC-AUC 0.9998) without abstention, with a false negative rate of 0.78\%. Under selective classification at uncertainty margin $\delta = 0.25$, abstaining on 2.16\% of borderline cases eliminates observed test errors on the covered partition (97.84\% coverage). On single-core CPU hardware, BEAP's computational decision pipeline executes in 2.03\,ms ($114\times$ faster than deep graph models) while consuming $<25$\,MB RAM, delivering an auditable, high-throughput defense for operational traffic inspection.
+\keywords{Phishing Detection \and Dynamic Browser Evidence \and Selective Classification \and Explainable AI \and Web Security \and Server-Side Request Forgery}
+\end{abstract}
+
+\section{Introduction}
+
+Phishing remains a primary initial access vector across enterprise networks and cloud services, causing billions of dollars in global annual losses~\cite{basit2021,zienie2023}. While earlier attacks relied on static brand impersonation and rudimentary email lures, modern threat actors deploy deceptive, dynamic infrastructure designed to bypass automated filters~\cite{tang2021}. Modern attack workflows incorporate client-side JavaScript cloaking, multi-stage redirection cascades, dynamic Document Object Model (DOM) mutation, and automated issuance of short-lived Transport Layer Security (TLS) certificates~\cite{sanchez2022,castano2023}. Furthermore, adversaries routinely place credential-harvesting forms on legitimate shared cloud platforms (e.g., Azure Blob Storage, AWS S3, Google Firebase), rendering traditional lexical URL analysis largely ineffective~\cite{kara2022,reyes2024}.
+
+Existing defensive technologies face distinct operational constraints against these evasion strategies:
+\begin{enumerate}[leftmargin=2.0em]
+    \item \textbf{Heuristic Blocklists and Feeds:} Services such as Google Safe Browsing, PhishTank, and OpenPhish supply reliable confirmations for cataloged indicators of compromise (IOCs)~\cite{purwanto2022}. However, active phishing infrastructure often exhibits an operational lifespan of fewer than twelve hours~\cite{castano2023}. By the time threat feeds verify and broadcast a domain, target credentials have frequently already been compromised.
+    \item \textbf{Static URL Heuristics:} Classifiers trained on syntactic URL properties process requests at wire speed~\cite{bu2021,zhao2023}. Yet when an attacker deploys clean paths on reputable cloud platforms, lexical heuristics find few anomalies to trigger an alert.
+    \item \textbf{Static HTML Scrapers:} Parsers examining static markup without browser rendering fail against single-page applications (SPAs) and obfuscated scripts where login forms are constructed dynamically at runtime~\cite{lin2021,ariyadasa2022}.
+\end{enumerate}
+
+To overcome static blind spots, recent academic research has turned toward deep neural and multimodal network architectures. For example, Kavya and Sumathi~\cite{kavya2025} introduced a multimodal temporal graph and hypergraph fusion framework combining graph convolutional networks (GCNs) and BERT language models~\cite{alsubaei2024}. While these architectures achieve high benchmark accuracy, they introduce substantial deployment challenges: inference latencies between 230\,ms and 400\,ms per page, gigabyte GPU memory footprints, vulnerability to gradient-based feature perturbations, and uninterpretable decision boundaries~\cite{calzarossa2025,alasmari2025}. In an enterprise security operations center (SOC) handling large volumes of inbound web traffic, black-box alerts that cannot explain their evidentiary basis place a heavy cognitive burden on security analysts~\cite{chai2022,le2026}.
+
+\subsection{The BEAP Methodology}
+
+In this work, we present \textbf{BEAP} (Browser-informed Evidence Augmentation and selective Abstention for Phishing detection), an explainable, resource-efficient framework designed for operational deployment. Rather than relying on complex graph neural networks, BEAP builds upon a practical operational observation: fraudulent websites frequently exhibit transport-layer and behavioral inconsistencies during browser interaction that cannot be concealed through URL obfuscation alone. Specifically, malicious infrastructure often omits standard HTTP security response headers (e.g., HSTS, Content-Security-Policy, X-Frame-Options), relies upon disposable or recently issued automated TLS certificates, and routes submitted credentials to external domains that do not match the origin page~\cite{sanchez2022,kalabarige2023}.
+
+Crucially, BEAP formalizes decision-making under uncertainty through \textit{selective classification with a reject option}~\cite{calzarossa2025,hendrickx2024}. Recognizing that false negatives allow credential theft while false positives drain analyst time, BEAP incorporates dual uncertainty thresholds ($\tau_{\text{low}}, \tau_{\text{high}}$) parameterized by margin $\delta \in [0.00, 0.35]$, alongside epistemic conflict detection between static and dynamic feature groups. When classifier confidence falls within an ambiguous margin or when static and dynamic indicators contradict one another, BEAP \textit{abstains} from an automated classification and defers the site to human analysts alongside an exact log-odds explanation report.
+
+\subsection{Key Contributions}
+
+The primary contributions of this paper are summarized as follows:
+\begin{enumerate}[leftmargin=2.0em]
+    \item \textbf{SSRF-Safe Dynamic Evidence Pipeline:} We implement an active probing pipeline that extracts 51 engineered features across lexical properties, DOM structure, HTTP response headers, TLS certificate details, and form destinations, protected by pre-flight and hop-by-hop SSRF boundaries.
+    \item \textbf{Dual-Threshold Selective Abstention Policy:} We implement a calibrated selective prediction mechanism controlled by uncertainty margin $\delta$, allowing security teams to trade automated coverage for verifiable error reduction.
+    \item \textbf{Closed-Form Log-Odds Explanations:} In place of sampling approximations, our explainability module computes an exact additive decomposition of predicted log-odds against training baselines: $\text{logit}(p) = b_0 + \sum_{i} \phi_i$.
+    \item \textbf{Leakage-Resistant Domain-Disjoint Evaluation:} We construct a benchmark of 2,400 samples across 1,379 unique registrable domains, partitioned strictly by domain ($\mathcal{D}_{\text{train}} \cap \mathcal{D}_{\text{val}} \cap \mathcal{D}_{\text{test}} = \emptyset$). BEAP achieves 99.22\% accuracy (ROC-AUC 0.9998) without abstention, and eliminates observed test errors at 97.84\% coverage ($\delta = 0.25$).
+    \item \textbf{Open-Source, Reproducible Implementation:} The complete feature extraction pipeline, benchmark generator, test scripts, and inspection dashboard are made available for open replication.
+\end{enumerate}
+
+\section{Related Work and Positioning}
+
+\subsection{Static Detection and Deep Multimodal Baselines}
+
+Static phishing detection has been surveyed by Basit et al.~\cite{basit2021}, Tang and Mahmoud~\cite{tang2021}, and Kustiawan and Ghauth~\cite{kustiawan2025}. Structural URL features like token counts and Shannon entropy offer useful initial triage signals~\cite{bu2021,kara2022}. In the DOM space, parsers evaluate input tags and hyperlink distributions~\cite{anupam2021,purwanto2022}. However, static methods fail whenever attackers deploy client-side JavaScript rendering or DOM obfuscation~\cite{lin2021,castano2023}.
+
+To overcome static evasion, recent literature explores automated browser inspection and deep learning. Lin et al.~\cite{lin2021} developed Phishpedia for visual logo recognition. S{\'a}nchez-Paniagua et al.~\cite{sanchez2022} demonstrated that dynamic credential prompts distinguish phishing campaigns. Shukla et al.~\cite{shukla2024} established that inspecting HTTP response headers provides critical discriminative signals. Multimodal deep architectures combine recurrent networks, GCNs, and transformers~\cite{ariyadasa2022,kavya2025}, but incur latencies over 230\,ms and require gigabytes of GPU VRAM, hindering wire-speed inspection.
+
+\begin{table}[t]
+\caption{Systematic positioning of BEAP against representative phishing detection paradigms.}
+\label{tab:positioning}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Capability / Dimension} & \textbf{Static Lexical~\cite{bu2021,kara2022}} & \textbf{Static HTML~\cite{anupam2021}} & \textbf{Graph Fusion~\cite{kavya2025}} & \textbf{BEAP (Proposed)} \\
+\midrule
+Dynamic Transport / Header Features & No & No & No & \textbf{Yes} \\
+Form Action Cross-Domain Tracking & No & Partial & Partial & \textbf{Yes} \\
+Decision Latency & $<1$\,ms & 2--5\,ms & 233.5\,ms & \textbf{2.03\,ms} \\
+Hardware Requirements & CPU & CPU & High-End GPU & \textbf{Single-Core CPU} \\
+Selective Abstention (Reject Option) & No & No & No & \textbf{Yes} \\
+Explainability & Linear Coeffs & Heuristic & Opaque / Black Box & \textbf{Exact Log-Odds} \\
+SSRF Defensive Boundary & N/A & Rare & Absent & \textbf{Rigorous (RFC 1918)} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsection{Explainable AI and Selective Classification}
+
+Explainability is essential for security analysts triaging machine learning alerts~\cite{chai2022,calzarossa2025,vaddempudi2025}. Selective classification (classification with a reject option) enables systems to trade coverage for reduced risk by withholding judgment on ambiguous instances~\cite{hendrickx2024}. Table~\ref{tab:positioning} summarizes BEAP's positioning against prevailing paradigms.
+
+\section{Research Questions}
+
+We structure our empirical evaluation around four targeted research questions:
+\begin{itemize}[leftmargin=2.0em]
+    \item \textbf{RQ1 (Predictive Performance):} Does augmenting static lexical features with dynamic transport and behavioral indicators improve detection accuracy and ROC-AUC under strict domain-disjoint evaluation?
+    \item \textbf{RQ2 (Selective Abstention Trade-off):} How effectively does dual-threshold abstention suppress false negatives and selective risk as coverage varies?
+    \item \textbf{RQ3 (Measured Execution Cost):} What is the measured decision latency of the BEAP pipeline on single-core CPU hardware compared to deep models?
+    \item \textbf{RQ4 (Defensive Safety Guarantee):} Does the SSRF pre-flight filter reliably block internal, private, and metadata network destinations without false blocks?
+\end{itemize}
+
+\section{System Architecture and Safety Model}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.88\textwidth]{figures/system_architecture.png}
+\caption{System architecture of the BEAP framework. Target URLs undergo pre-flight SSRF validation before simultaneous static extraction (28 features) and dynamic transport inspection (23 features). The 51-dimensional vector informs a calibrated classifier governed by dual-threshold selective abstention and closed-form log-odds explanation.}
+\label{fig:system_arch}
+\end{figure}
+
+\subsection{Threat Model and Operational Boundary}
+
+We consider an enterprise gateway or endpoint defense setting where BEAP inspects suspicious URLs flagged in incoming emails or proxy logs. The adversary controls the target domain, DNS records, TLS certificates, and server configuration. Their goal is to harvest credentials while evading static filters through dynamic redirection, obfuscated source code, and shared cloud hosting~\cite{castano2023,reyes2024}. Active probing can introduce severe risks if implemented naively: an adversary could supply an internal target address (e.g., \url{http://169.254.169.254/latest/meta-data/} or \url{http://192.168.1.1/admin}) to trigger Server-Side Request Forgery (SSRF) and coerce the scanner into probing internal enterprise networks.
+
+\subsection{SSRF Prevention and Request Sanitization}
+
+To ensure safe dynamic evidence collection, BEAP enforces an isolated pre-flight validation boundary in \texttt{beap/safety.py}. Before initiating any outbound connection or following a redirect, the target hostname is resolved via system DNS. The resulting IP address is validated against strict exclusion lists:
+(1) RFC 1918 private IPv4 subnets (\texttt{10.0.0.0/8}, \texttt{172.16.0.0/12}, \texttt{192.168.0.0/16});
+(2) Loopback addresses (\texttt{127.0.0.0/8}, \texttt{::1});
+(3) Link-local and cloud metadata ranges (\texttt{169.254.0.0/16}, \texttt{fe80::/10});
+(4) Unique-local IPv6 subnets (\texttt{fc00::/7}); and
+(5) Multicast and reserved spaces (\texttt{224.0.0.0/4}, \texttt{240.0.0.0/4}).
+Requests resolving to prohibited destinations or non-HTTP schemes (\texttt{file://}, \texttt{gopher://}) are terminated immediately. Redirect chains are validated hop-by-hop ($N_{\text{max}} = 5$).
+
+\begin{table}[t]
+\caption{Empirical validation of BEAP SSRF boundary enforcement across adversarial and internal target vectors.}
+\label{tab:ssrf_validation}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llllc}
+\toprule
+\textbf{Target Category} & \textbf{Candidate Input Target} & \textbf{Resolved Scope} & \textbf{Enforcement Layer} & \textbf{Verdict} \\
+\midrule
+Loopback IPv4 & \url{http://127.0.0.1:8080/admin} & 127.0.0.1 & Pre-flight Host Filter & \textbf{BLOCKED} \\
+Loopback Hostname & \url{http://localhost:3000/api} & 127.0.0.1 & DNS Pre-resolution & \textbf{BLOCKED} \\
+Loopback IPv6 & \url{http://[::1]/status} & ::1 & Host Parser Filter & \textbf{BLOCKED} \\
+Private RFC 1918 (Class A) & \url{http://10.0.1.5/internal-auth} & 10.0.1.5 & Subnet Range Validator & \textbf{BLOCKED} \\
+Private RFC 1918 (Class B) & \url{http://172.16.5.20/db-admin} & 172.16.5.20 & Subnet Range Validator & \textbf{BLOCKED} \\
+Private RFC 1918 (Class C) & \url{http://192.168.1.1/setup.cgi} & 192.168.1.1 & Subnet Range Validator & \textbf{BLOCKED} \\
+Cloud Instance Metadata & \url{http://169.254.169.254/latest/} & 169.254.169.254 & Link-Local / Metadata Blacklist & \textbf{BLOCKED} \\
+GCP Cloud Metadata & \url{http://metadata.google.internal/} & Metadata Scope & Prohibited Host Filter & \textbf{BLOCKED} \\
+Disallowed Scheme (file) & \url{file:///etc/passwd} & Local File & Scheme Whitelist Guard & \textbf{BLOCKED} \\
+Disallowed Scheme (gopher) & \url{gopher://127.0.0.1:6379/_} & Legacy Proto & Scheme Whitelist Guard & \textbf{BLOCKED} \\
+Unsafe Redirect Cascade & \url{https://public.site/r} $\to$ \url{192.168.1.50} & 192.168.1.50 & Hop-by-Hop Redirect Check & \textbf{BLOCKED} \\
+Public Benign Domain & \url{https://example.com/login} & 93.184.216.34 & Validated Public Host & \textbf{ALLOWED} \\
+Public Secured DNS & \url{https://1.1.1.1/dns-query} & 1.1.1.1 & Validated Public Host & \textbf{ALLOWED} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\textbf{Empirical SSRF Validation (RQ4):} As summarized in Table~\ref{tab:ssrf_validation}, we tested 12 representative injection vectors across private, loopback, cloud metadata, and protocol abuse scenarios, including redirection cascades. BEAP intercepted and severed 100\% of internal probes before socket connection or during intermediate redirect hops, while seamlessly permitting legitimate public hosts.
+
+\subsection{Feature Representation and Modalities}
+
+BEAP extracts 51 engineered features across three distinct modalities:
+\begin{itemize}[leftmargin=2.0em]
+    \item \textbf{Static URL Modality (17 Features):} Syntactic URL properties extracted without network access: URL length, domain length, path length, query length, subdomain depth, hyphen/underscore counts, digit ratio, Shannon entropy, IP-literal flags, brand tokens, and typosquatting edit distances~\cite{bu2021,kara2022}.
+    \item \textbf{Static HTML DOM Modality (11 Features):} Parsed from initial markup: total HTML length, form counts, password field presence, hidden inputs, external script ratio, iframe presence, and external link ratio~\cite{anupam2021}.
+    \item \textbf{Dynamic Transport and Behavioral Modality (23 Features):} Gathered during session establishment: HTTPS usage, TLS certificate validity, certificate lifetime remaining in days, issuer authority category, HSTS duration, CSP presence and directive richness, X-Frame-Options anti-framing rules, X-Content-Type-Options \texttt{nosniff}, Referrer-Policy, cookie security flags, redirect hop count, domain switching across redirects, and cross-domain form action exfiltration ($x_{\text{cross}} = 1.0$)~\cite{sanchez2022,shukla2024}.
+\end{itemize}
+
+\subsection{Selective Abstention and Decision Protocol}
+
+Let $f(\mathbf{x}) = P(Y = 1 \mid \mathbf{x}) \in [0, 1]$ denote the estimated probability of phishing. Standard binary classifiers force an automated call at $\tau = 0.5$. In security operations, forcing a binary choice when $f(\mathbf{x}) \approx 0.5$ causes avoidable errors. BEAP replaces this with a selective rule $g: \mathcal{X} \to \{0, 1, \bot\}$, where $\bot$ represents selective abstention (deferral to SOC review), governed by uncertainty margin $\delta \in [0.00, 0.35]$:
+\begin{equation}
+\tau_{\text{low}} = 0.5 - \delta, \quad \tau_{\text{high}} = 0.5 + \delta
+\end{equation}
+\begin{equation}
+g(\mathbf{x}) = \begin{cases}
+1 \text{ (Phishing)}, & \text{if } f(\mathbf{x}) \ge \tau_{\text{high}} \\
+0 \text{ (Legitimate)}, & \text{if } f(\mathbf{x}) \le \tau_{\text{low}} \\
+\bot \text{ (Abstain / SOC Review)}, & \text{if } \tau_{\text{low}} < f(\mathbf{x}) < \tau_{\text{high}}
+\end{cases}
+\end{equation}
+In addition, cross-modality agreement is monitored: if $|f_{\text{static}}(\mathbf{x}_{\text{static}}) - f_{\text{dynamic}}(\mathbf{x}_{\text{dynamic}})| > 0.60$, the system flags an epistemic conflict and outputs $\bot$, preventing evasion techniques that exploit the blind spot of any single modality.
+
+\subsection{Closed-Form Log-Odds Explanations}
+
+For auditable analyst triage, BEAP decomposes the predicted logit against training baseline expectations $\bar{\mathbf{x}} = \mathbb{E}[\mathbf{x}]$:
+\begin{equation}
+\text{logit}(p) = \underbrace{w_0 + \sum_{i=1}^{51} w_i \bar{x}_i}_{b_0 \text{ (Baseline Log-Odds)}} + \sum_{i=1}^{51} \underbrace{w_i (x_i - \bar{x}_i)}_{\phi_i \text{ (Attribution)}}
+\end{equation}
+Positive attributions ($\phi_i > 0$) highlight risk factors driving the prediction toward phishing, while negative attributions ($\phi_i < 0$) indicate trust factors supporting legitimacy.
+
+\section{Experimental Evaluation}
+
+\subsection{Benchmark Dataset and Leakage Prevention}
+
+Evaluating phishing classifiers with random URL-level splits often scatters pages from the same domain across training and test sets, causing optimistic data leakage~\cite{sanchez2022,castano2023}. To ensure rigorous evaluation, we constructed a benchmark of 2,400 samples across 1,379 unique registrable domains under strict \textbf{domain-disjoint partitioning}:
+\begin{itemize}[leftmargin=2.0em]
+    \item \textbf{Training Partition:} 1,706 samples across 981 unique domains.
+    \item \textbf{Validation Partition:} 184 samples across 108 unique domains.
+    \item \textbf{Held-Out Testing Partition:} 510 samples across 290 unique domains.
+\end{itemize}
+Domains do not overlap across splits ($\mathcal{D}_{\text{train}} \cap \mathcal{D}_{\text{val}} \cap \mathcal{D}_{\text{test}} = \emptyset$). Samples incorporate multi-tier difficulty: 20\% hard ambiguous cases (legitimate SaaS with third-party SSO vs. clean phishing templates), 40\% moderate cases, and 40\% baseline cases.
+
+\begin{table}[t]
+\caption{Modality ablation analysis under strict domain-disjoint evaluation on the held-out test split ($N=510$).}
+\label{tab:ablation}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrr}
+\toprule
+\textbf{Modality} & \textbf{Classifier} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} & \textbf{ROC-AUC} & \textbf{Brier} \\
+\midrule
+Static URL Only & Logistic Reg. & 0.9431 & 0.9351 & 0.9533 & 0.9441 & 0.9943 & 0.0310 \\
+Static URL Only & XGBoost & 0.9882 & 0.9960 & 0.9805 & 0.9882 & 0.9998 & 0.0066 \\
+Static URL + HTML & Logistic Reg. & 0.9745 & 0.9880 & 0.9611 & 0.9744 & 0.9974 & 0.0196 \\
+Static URL + HTML & XGBoost & 0.9922 & 0.9961 & 0.9883 & 0.9922 & 0.9999 & 0.0063 \\
+Dynamic Only & Logistic Reg. & 0.9549 & 0.9398 & 0.9728 & 0.9560 & 0.9934 & 0.0330 \\
+Dynamic Only & XGBoost & 0.9608 & 0.9472 & 0.9767 & 0.9617 & 0.9937 & 0.0293 \\
+\textbf{BEAP Multimodal} & \textbf{Logistic Reg.} & \textbf{0.9922} & \textbf{0.9922} & \textbf{0.9922} & \textbf{0.9922} & \textbf{0.9998} & \textbf{0.0065} \\
+\textbf{BEAP Multimodal} & \textbf{XGBoost} & \textbf{0.9941} & \textbf{0.9922} & \textbf{0.9961} & \textbf{0.9942} & \textbf{0.9998} & \textbf{0.0054} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/roc_curves.png}
+\hfill
+\includegraphics[width=0.48\textwidth]{figures/pr_curves.png}
+\caption{Receiver Operating Characteristic (ROC) and Precision-Recall (PR) curves across modalities under domain-disjoint evaluation. Multimodal BEAP consistently outperforms individual sub-modalities.}
+\label{fig:curves}
+\end{figure}
+
+\subsection{RQ1: Predictive Performance Across Modalities}
+
+Table~\ref{tab:ablation} and Fig.~\ref{fig:curves} present ablation results on the 510 held-out test samples. Static URL features alone achieve 94.31\% accuracy (Logistic Regression), leaving a 5.69\% error rate due to lexical obfuscation. Adding HTML features increases accuracy to 97.45\%. Dynamic browser evidence alone reaches 95.49\% accuracy, demonstrating strong standalone discriminative power. Combining static and dynamic signals in \textbf{BEAP Multimodal} achieves the highest performance: \textbf{99.22\% accuracy} (ROC-AUC 0.9998, Brier score 0.0065) for calibrated Logistic Regression and 99.41\% for XGBoost.
+
+\begin{table}[t]
+\caption{Feature contribution and operational rationale across key transport, header, and content indicators in the calibrated BEAP model.}
+\label{tab:feature_analysis}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccl}
+\toprule
+\textbf{Feature Identifier} & \textbf{Modality} & \textbf{Model Weight} & \textbf{Impact Direction} & \textbf{Operational Security Rationale} \\
+\midrule
+\texttt{suspicious\_keyword\_count} & Static URL & $+2.7127$ & Phishing Risk ($+$) & Presence of credential-harvesting tokens (\textit{login}, \textit{verify}). \\
+\texttt{cert\_longevity\_days} & Dynamic Transport & $-2.1606$ & Benign Trust ($-$) & Long-duration certificates characteristic of vetted enterprise domains. \\
+\texttt{csp\_blocks\_eval\_inline} & Dynamic Transport & $-1.8361$ & Benign Trust ($-$) & Strict CSP mitigates script injection and overlay attacks. \\
+\texttt{hostname\_length} & Static URL & $+1.3782$ & Phishing Risk ($+$) & Excessive domain length typical of deceptive sub-domain masking. \\
+\texttt{x\_frame\_options\_strict} & Dynamic Transport & $-1.3075$ & Benign Trust ($-$) & Anti-framing policy (\texttt{DENY}/\texttt{SAMEORIGIN}) blocks clickjacking. \\
+\texttt{has\_iframe} & Static HTML & $+1.3027$ & Phishing Risk ($+$) & Hidden iframes often embed secondary harvesting forms. \\
+\texttt{cert\_valid} & Dynamic Transport & $-0.6876$ & Benign Trust ($-$) & Valid cryptographic handshake confirms baseline TLS compliance. \\
+\texttt{has\_x\_content\_type\_options} & Dynamic Transport & $-0.6770$ & Benign Trust ($-$) & \texttt{nosniff} directive blocks MIME-type confusion script execution. \\
+\texttt{hsts\_max\_age\_adequate} & Dynamic Transport & $-0.5205$ & Benign Trust ($-$) & Persistent HSTS headers prevent SSL-stripping downgrades. \\
+\texttt{form\_action\_cross\_domain} & Dynamic Behavioral & $+0.1711$ & Phishing Risk ($+$) & Forms transmitting credentials to an unrelated external domain. \\
+\texttt{cert\_is\_free\_or\_short\_lived} & Dynamic Transport & $-0.1771$ & Contextual Neutral & Automated CA issuance (Let's Encrypt); non-discriminative alone. \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsection{Feature-Wise Analysis and Handling of Free TLS Certificates}
+
+Table~\ref{tab:feature_analysis} details individual feature weights extracted from the trained pipeline. Security headers serve as strong trust anchors: strict CSP directives (\texttt{csp\_blocks\_eval\_inline}, weight $-1.8361$), strict framing controls (\texttt{x\_frame\_options\_strict}, weight $-1.3075$), and persistent HSTS (weight $-0.5205$) produce substantial negative log-odds shifts that strongly support site legitimacy.
+
+\textbf{Free TLS Certificate Interpretation:} Because automated Certificate Authorities (such as Let's Encrypt and ZeroSSL) are ubiquitous across benign websites worldwide, treating a free certificate as inherently malicious would cause intolerable false alarms. In BEAP, \texttt{cert\_is\_free\_or\_short\_lived} has an empirically neutral weight ($-0.1771$). BEAP \textbf{never} blocks a website solely for using a free certificate. Instead, it relies on cross-modal conjunction:
+\begin{itemize}[leftmargin=1.5em]
+    \item \textit{Legitimate Let's Encrypt site:} Same-origin form submission ($x_{\text{cross}} = 0$) and standard security headers generate cumulative trust attributions that heavily outweigh the short certificate lifespan.
+    \item \textit{Phishing Let's Encrypt site:} The attacker acquires a free certificate for the padlock icon, but routes credential submissions to an external drop-server ($x_{\text{cross}} = 1.0$), omits security headers, and uses typosquatted domains. Malice is established by exfiltration and deceptive structure, not the certificate provider.
+\end{itemize}
+
+\subsection{RQ2: Selective Abstention and Error Suppression}
+
+Table~\ref{tab:abstention_tradeoff} reports selective classification performance as the uncertainty margin $\delta$ sweeps from 0.00 to 0.35 on the held-out test split ($N=510$).
+
+\begin{table}[t]
+\caption{Selective classification performance across uncertainty margins $\delta$ on the held-out test split ($N=510$).}
+\label{tab:abstention_tradeoff}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrlrrrrrr}
+\toprule
+\textbf{Model} & $\mathbf{\delta}$ & \textbf{Interval} & \textbf{Coverage} & \textbf{Abstain} & \textbf{Sel. Acc.} & \textbf{Sel. Risk} & \textbf{Sel. FNR} & \textbf{Sel. FPR} \\
+\midrule
+Static Baseline & 0.00 & $[0.50, 0.50]$ & 100.00\% & 0.00\% & 97.45\% & 2.55\% & 3.89\% & 1.19\% \\
+BEAP Multimodal & 0.00 & $[0.50, 0.50]$ & 100.00\% & 0.00\% & 99.22\% & 0.78\% & 0.78\% & 0.79\% \\
+Static Baseline & 0.15 & $[0.35, 0.65]$ & 97.84\% & 2.16\% & 98.20\% & 1.80\% & 3.19\% & 0.40\% \\
+BEAP Multimodal & 0.15 & $[0.35, 0.65]$ & 98.63\% & 1.37\% & 99.60\% & 0.40\% & 0.79\% & 0.00\% \\
+\textbf{Static Baseline} & \textbf{0.25} & $[0.25, 0.75]$ & 93.92\% & 6.08\% & 99.16\% & 0.84\% & 1.22\% & 0.43\% \\
+\textbf{BEAP Multimodal} & \textbf{0.25} & $[0.25, 0.75]$ & \textbf{97.84\%} & \textbf{2.16\%} & \textbf{100.00\%} & \textbf{0.00\%} & \textbf{0.00\%} & \textbf{0.00\%} \\
+Static Baseline & 0.35 & $[0.15, 0.85]$ & 90.78\% & 9.22\% & 99.78\% & 0.22\% & 0.42\% & 0.00\% \\
+BEAP Multimodal & 0.35 & $[0.15, 0.85]$ & 96.27\% & 3.73\% & 100.00\% & 0.00\% & 0.00\% & 0.00\% \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/coverage_tradeoff.png}
+\hfill
+\includegraphics[width=0.48\textwidth]{figures/fnr_suppression_curve.png}
+\caption{Accuracy-coverage trade-off and FNR suppression across abstention rate. BEAP maintains higher coverage at every accuracy tier and eliminates observed test errors at $\delta = 0.25$.}
+\label{fig:abstention}
+\end{figure}
+
+At $\delta = 0.00$, BEAP exhibits an initial FNR of 0.78\% and risk of 0.78\% (versus 3.89\% FNR and 2.55\% risk for the static baseline). At $\delta = 0.25$, abstaining on 2.16\% of borderline instances (11 cases in the test set) resolves all observed misclassifications in the covered partition (97.84\% coverage). As shown in Fig.~\ref{fig:abstention}, BEAP routes only 22 out of every 1,000 cases to human review. We emphasize that while zero test errors are observed within this calibrated split, residual risk naturally persists in open-world deployments; abstention functions as a practical risk-reduction filter rather than an absolute guarantee.
+
+\subsection{RQ3: Measured Latency and Efficiency}
+
+\begin{table}[t]
+\caption{Granular latency breakdown of the BEAP pipeline stages measured over 1,000 iterations on single-core CPU hardware.}
+\label{tab:latency_breakdown}
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Pipeline Stage} & \textbf{Mean Latency (ms)} & \textbf{Share of Total (\%)} \\
+\midrule
+1. Static URL \& HTML Parsing & 0.404\,ms & 19.9\% \\
+2. Dynamic Header \& Cert Parsing & 0.654\,ms & 32.2\% \\
+3. Feature Scaling \& Vectorization & 0.149\,ms & 7.3\% \\
+4. Classifier Inference (Logistic Regression) & 0.190\,ms & 9.3\% \\
+5. Log-Odds Explanation Generation & 0.050\,ms & 2.5\% \\
+Framework Overhead & 0.587\,ms & 28.8\% \\
+\midrule
+\textbf{Total Decision Pipeline (Logistic Regression)} & \textbf{2.034\,ms} & \textbf{100.0\%} \\
+Total Decision Pipeline (XGBoost + TreeSHAP) & 6.381\,ms & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Comparative efficiency benchmarking separating directly measured BEAP performance from figures published in recent literature.}
+\label{tab:latency_benchmark}
+\centering
+\begin{tabular}{lllrr}
+\toprule
+\textbf{System / Architecture} & \textbf{Measurement Basis} & \textbf{Hardware} & \textbf{Latency} & \textbf{Throughput} \\
+\midrule
+\textbf{BEAP (Logistic Reg.) [This Work]} & Directly Measured (1,000 runs) & CPU (Single Core) & \textbf{2.03\,ms} & \textbf{491.7\,eps} \\
+BEAP (XGBoost + TreeSHAP) [This Work] & Directly Measured (1,000 runs) & CPU (Single Core) & 6.38\,ms & 156.7\,eps \\
+Multimodal Graph Fusion~\cite{kavya2025} & Reported in Literature & NVIDIA GPU & 233.50\,ms & 4.28\,eps \\
+Visual CNN + Transformer~\cite{lin2021} & Reported in Literature & GPU / Server CPU & 372.00\,ms & 2.69\,eps \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tables~\ref{tab:latency_breakdown} and~\ref{tab:latency_benchmark} summarize timing benchmarks on standard Intel x86-64 CPU hardware over 1,000 runs. BEAP's algorithmic decision pipeline executes in \textbf{2.034\,ms} per sample (491.7 evaluations per second on a single CPU core) while using $<25$\,MB RAM. This is $114\times$ faster than deep multimodal graph fusion (233.5\,ms)~\cite{kavya2025} and operates entirely without GPU infrastructure.
+
+\subsection{Explainable Triage Walkthrough (Case Study)}
+
+To illustrate explainability during triage, consider an evasive phishing page mimicking PayPal (\url{https://auth-verification-paypal-notice.xyz/account/login}):
+\begin{itemize}[leftmargin=1.5em]
+    \item \textit{Static Assessment:} The URL uses standard form inputs, yielding an ambiguous score ($p_{\text{static}} = 0.54$).
+    \item \textit{Dynamic BEAP Assessment:} Live inspection reveals form submission to an external destination (\url{http://malicious-collector-hub.net/steal.php}), a short 45-day certificate, and omitted HSTS/CSP headers.
+    \item \textit{Verdict and Attribution:} Predicted phishing probability $p = 0.999 \ge \tau_{\text{high}}$ (Automated Phishing Block). Attributions verified directly from model decomposition: \texttt{suspicious\_keyword\_count} ($+5.70$), \texttt{hostname\_length} ($+3.30$), \texttt{cert\_longevity\_days} ($+1.75$), \texttt{form\_action\_cross\_domain} ($+0.17$), and missing security header penalties.
+\end{itemize}
+
+\section{Discussion and Operational SOC Triage}
+
+While deferring ambiguous cases guarantees high selective reliability, enterprise deployment requires structured workload management to prevent review queues from saturating during traffic bursts. We propose five operational guidelines:
+\begin{enumerate}[leftmargin=2.0em]
+    \item \textbf{Directional Risk-Prioritized Queueing:} Rather than FIFO processing, deferred cases are sorted descending by posterior probability $f(\mathbf{x})$. Samples closer to the phishing threshold $\tau_{\text{high}}$ ($p \approx 0.70$) are surfaced immediately, while lower-risk ambiguities ($p \approx 0.30$) are reviewed during off-peak windows.
+    \item \textbf{Multi-Tier Severity Partitioning:} Alerts with active credential fields and unresolved cross-domain targets demand immediate analyst review; missing optional headers on new domains without login forms receive secondary priority.
+    \item \textbf{Rapid-Audit Explanation Dossiers:} Pre-compiled log-odds attributions and session snapshots provide instant diagnostic clarity, replacing slow manual script de-obfuscation with focused evidentiary reviews.
+    \item \textbf{Safe Deferral Containment:} Deferred cases must never default-allow; URLs pending review are held under provisional containment (e.g., remote browser isolation or an interstitial warning banner).
+    \item \textbf{Adaptive Margin Modulation:} During peak volume, $\delta$ can be dynamically narrowed (e.g., to 0.15), expanding automated coverage to 98.63\% while preserving 99.60\% selective accuracy.
+\end{enumerate}
+
+\section{Threats to Validity and Limitations}
+
+\begin{enumerate}[leftmargin=2.0em]
+    \item \textbf{Latency Separation (Processing vs. Network Probing):} A clear distinction exists between BEAP's 2.03\,ms algorithmic decision pipeline (feature vectorization, classification, log-odds calculation) and active network transport probing. Performing live TCP/TLS handshakes and HTTP retrieval introduces a network latency floor of 0.5--2.0\,s wall-clock time. BEAP mitigates this via an exponential-decay LRU domain memory cache ($T_{1/2} = 24$\,h) that bypasses network probes for recently verified benign hosts.
+    \item \textbf{Dynamic Cloaking and Fingerprinting:} Sophisticated threat actors may inspect client environment signatures (e.g., headless browser flags, window dimensions) and withhold malicious content~\cite{lin2021}. Countering cloaking requires residential IP proxies and stealth browser automation.
+    \item \textbf{External Dataset Validation:} While our 2,400-sample benchmark enforces strict domain-disjoint splitting to prevent data leakage, adversaries continuously adapt phishing templates. Longitudinal validation against independently collected live threat intelligence feeds (e.g., daily ingestion from OpenPhish and PhishTank) represents vital ongoing work.
+\end{enumerate}
+
+\section{Reproducibility}
+
+Reproduction materials include feature extraction modules, the calibrated benchmark generator, unit tests, and the interactive Streamlit inspection tool: \url{https://github.com/mitesh-k/beap-phishing-detection}. All experimental runs execute deterministically with fixed random seeds.
+
+\section{Conclusion}
+
+This paper presented \textbf{BEAP}, a lightweight, explainable phishing detection framework combining static lexical analysis, browser-observed dynamic evidence, and selective classification. By tracking HTTP security headers, TLS certificate provenance, and form action destinations under an SSRF-safe execution boundary, BEAP overcomes static blind spots while avoiding the heavy compute overhead of deep graph models.
+
+On a benchmark of 2,400 samples across 1,379 unique domains under strict domain-disjoint splitting, BEAP achieved 99.22\% accuracy (ROC-AUC 0.9998) without abstention. Under selective classification at $\delta = 0.25$, abstaining on 2.16\% of borderline instances eliminated observed test errors across 97.84\% covered traffic. With a computational decision latency of 2.03\,ms on a single CPU core, BEAP provides an auditable, high-throughput defense suitable for operational deployment.
+
+\begin{thebibliography}{22}
+
+\bibitem{basit2021}
+Basit, A., Zafar, M., Liu, X., Javed, A.R., Jalil, Z., Kifayat, K.: A comprehensive survey of AI-enabled phishing attacks detection techniques. Telecommun. Syst. 76, 139--154 (2021)
+
+\bibitem{tang2021}
+Tang, L., Mahmoud, Q.H.: A survey of machine learning-based solutions for phishing website detection. Mach. Learn. Knowl. Extr. 3(3), 672--694 (2021)
+
+\bibitem{zienie2023}
+Zieni, R., Massari, L., Calzarossa, M.C.: Phishing or not phishing? A survey on the detection of phishing websites. IEEE Access 11, 18499--18519 (2023)
+
+\bibitem{lin2021}
+Lin, Y., Liu, R., Divakaran, D.M., Ng, J.Y., Chan, Q.Z., Lu, Y., Si, Y., Zhang, F., Dong, J.S.: Phishpedia: A hybrid deep learning based approach to visually identify phishing webpages. In: 30th USENIX Security Symposium, pp. 3793--3810 (2021)
+
+\bibitem{anupam2021}
+Anupam, S., Kar, A.K.: Phishing website detection using support vector machines and nature-inspired optimization algorithms. Telecommun. Syst. 76, 17--32 (2021)
+
+\bibitem{bu2021}
+Bu, S.-J., Cho, S.-B.: Deep character-level anomaly detection based on a convolutional autoencoder for zero-day phishing URL detection. Electronics 10(12), 1492 (2021)
+
+\bibitem{purwanto2022}
+Purwanto, R.W., Pal, A., Blair, A., Jha, S.: PhishSim: Aiding phishing website detection with a feature-free tool. IEEE Trans. Inf. Forensics Secur. 17, 1497--1512 (2022)
+
+\bibitem{ariyadasa2022}
+Ariyadasa, S., Fernando, S., Fernando, S.: Combining long-term recurrent convolutional and graph convolutional networks to detect phishing sites using URL and HTML. IEEE Access 10, 82355--82375 (2022)
+
+\bibitem{sanchez2022}
+S{\'a}nchez-Paniagua, M., Fern{\'a}ndez, E.F., Alegre, E., Al-Nabki, W., Gonz{\'a}lez-Castro, V.: Phishing URL detection: A real-case scenario through login URLs. IEEE Access 10, 42949--42960 (2022)
+
+\bibitem{kara2022}
+Kara, I., Ok, M., Ozaday, A.: Characteristics of understanding URLs and domain names features: The detection of phishing websites with machine learning methods. IEEE Access 10, 124420--124428 (2022)
+
+\bibitem{chai2022}
+Chai, Y., Zhou, Y., Li, W., Jiang, Y.: An explainable multi-modal hierarchical attention model for developing phishing threat intelligence. IEEE Trans. Dependable Secur. Comput. 19, 790--803 (2022)
+
+\bibitem{kalabarige2023}
+Kalabarige, L.R., Rao, R.S., Pais, A.R., Gabralla, L.A.: A boosting-based hybrid feature selection and multi-layer stacked ensemble learning model to detect phishing websites. IEEE Access 11, 71180--71193 (2023)
+
+\bibitem{castano2023}
+Casta{\~n}o, F., Fern{\'a}ndez, E.F., Alaiz-Rodr{\'i}guez, R., Alegre, E.: PhiKitA: Phishing kit attacks dataset for phishing websites identification. IEEE Access 11, 40779--40789 (2023)
+
+\bibitem{zhao2023}
+Almousa, M., Anwar, M.: A URL-based social semantic attacks detection with character-aware language model. IEEE Access 11, 10654--10663 (2023)
+
+\bibitem{alsubaei2024}
+Alsubaei, F.S., Almazroi, A.A., Ayub, N.: Enhancing phishing detection: A novel hybrid deep learning framework for cybercrime forensics. IEEE Access 12, 8373--8389 (2024)
+
+\bibitem{reyes2024}
+Reyes-Dorta, N., Caballero-Gil, P., Rosa-Remedios, C.: Detection of malicious URLs using machine learning. Wirel. Netw. 30, 7543--7560 (2024)
+
+\bibitem{calzarossa2025}
+Calzarossa, M.C., Giudici, P., Zieni, R.: An assessment framework for explainable AI with applications to cybersecurity. Artif. Intell. Rev. 58, 150 (2025)
+
+\bibitem{kavya2025}
+Kavya, S., Sumathi, D.: Multimodal and temporal graph fusion framework for advanced phishing website detection. IEEE Access 13, 74128--74146 (2025)
+
+\bibitem{shukla2024}
+Shukla, S., Misra, M., Varshney, G.: HTTP header based phishing attack detection using machine learning. Trans. Emerg. Telecommun. Technol. 35(1), e4872 (2024)
+
+\bibitem{hendrickx2024}
+Hendrickx, K., Perini, L., Van der Plas, D., Meert, W., Davis, J.: Machine learning with a reject option: A survey. Mach. Learn. 113, 3073--3110 (2024)
+
+\bibitem{kustiawan2025}
+Kustiawan, Y.A., Ghauth, K.I.: Feature engineering for phishing website detection using machine learning: A systematic review. IEEE Access 13, 192080--192104 (2025)
+
+\bibitem{vaddempudi2025}
+Vaddempudi, N.S., Sajja, D., Phanidar, C., Basavaraju, S.: Lightweight and explainable phishing URL detection using feature selection and XGBoost. In: Proc. IIPEM, pp. 1--6 (2025)
+
+\end{thebibliography}
+
+\end{document}
+

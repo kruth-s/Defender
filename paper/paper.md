@@ -1,8 +1,9 @@
 # Browser-Driven Evidence Augmentation and Selective Abstention for Explainable Phishing Website Detection
 
-**Target Venue:** Research Track, International Conference on Information and Communications Technology & Security (ICTCS) / IEEE Conference format  
-**Authors:** Anonymous Authors  
-**Artifact Repository:** `f:\Paper`
+**Target Venue:** ICTCS 2026 (Springer LNNS)  
+**Authors:** Atreyaa AVS (✉), Kruthik S, C Athish Kiran Kumar, Ayushman Patel, and Monesh N  
+**Affiliation:** RV University, Bengaluru, India (`atreyaaavs.btech23@rvu.edu.in`)  
+**Artifact Repository:** `f:\Defender`
 
 ---
 
@@ -122,10 +123,10 @@ BEAP incorporates four interconnected architectural layers:
 
 ### 3.1 SOC Analyst Workload Management
 At $\delta = 0.25$, BEAP achieves 97.84% automated coverage and defers 2.16% of ambiguous traffic (22 per 1,000 URLs) to SOC analysts. To manage alert volume:
-1. **Risk-Prioritized Queueing:** Abstained cases are sorted by posterior risk divergence $|f(\mathbf{x}) - 0.5|$, immediately escalating borderline threats leaning towards $\tau_{high}$.
-2. **Multi-Tier Severity Triage:** High-urgency cases (active credential fields + cross-domain targets) receive immediate human review; low-urgency edge cases are queued for off-peak inspection.
-3. **Pre-Compiled Diagnostic Dossiers:** Closed-form log-odds attributions and exact session evidence reduce manual triage time from minutes to under 15–30 seconds.
-4. **Safe Deferral Containment:** Deferred cases are never default-allowed; they are placed under provisional isolation (e.g., browser sandbox or cautionary interstitial banner).
+1. **Directional Risk-Prioritized Queueing:** Abstained cases are sorted descending by posterior risk $f(\mathbf{x})$, immediately escalating borderline threats leaning towards $\tau_{high}$ (e.g. $p \approx 0.70$) over low-risk ambiguities.
+2. **Multi-Tier Severity Triage:** High-urgency cases (active credential fields + cross-domain targets) receive immediate human review; lower-urgency edge cases are queued for off-peak inspection.
+3. **Pre-Compiled Diagnostic Dossiers:** Closed-form log-odds attributions and exact session evidence provide instant evidentiary clarity, avoiding slow manual script de-obfuscation.
+4. **Safe Deferral Containment:** Deferred cases are never default-allowed; they are placed under provisional isolation (e.g., remote browser sandbox or cautionary interstitial banner).
 5. **Adaptive Margin Modulation:** Under burst volume, $\delta$ can be dynamically narrowed (e.g., to 0.15), expanding automated coverage to 98.63% while maintaining 99.60% selective accuracy.
 
 ### 3.2 Threats to Validity and Scope Limitations
