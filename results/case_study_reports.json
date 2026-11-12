@@ -1,0 +1,224 @@
+[
+  {
+    "url": "https://auth-verification-paypal-notice.xyz/account/login",
+    "verdict": "PHISHING",
+    "phishing_probability": 0.9999999966651631,
+    "abstained": false,
+    "abstention_reason": "High phishing confidence (p=1.000 >= tau_high=0.65)",
+    "baseline_log_odds": 0.7662,
+    "total_predicted_log_odds": 19.5188,
+    "top_risk_signals": [
+      {
+        "feature": "suspicious_keyword_count",
+        "weight": 5.6956,
+        "raw_value": 5.0,
+        "explanation": "URL string contains credential-harvesting or brand impersonation keywords."
+      },
+      {
+        "feature": "hostname_length",
+        "weight": 3.3016,
+        "raw_value": 35.0,
+        "explanation": "Feature 'hostname_length' (value=35.00) increased phishing score."
+      },
+      {
+        "feature": "has_hidden_inputs",
+        "weight": 3.0651,
+        "raw_value": 0.0,
+        "explanation": "Feature 'has_hidden_inputs' (value=0.00) increased phishing score."
+      },
+      {
+        "feature": "cert_longevity_days",
+        "weight": 1.7475,
+        "raw_value": 45.0,
+        "explanation": "Feature 'cert_longevity_days' (value=45.00) increased phishing score."
+      },
+      {
+        "feature": "subdomain_count",
+        "weight": 1.2674,
+        "raw_value": 0.0,
+        "explanation": "Excessive subdomain nesting used to disguise destination domain."
+      }
+    ],
+    "top_trust_signals": [
+      {
+        "feature": "has_csp",
+        "weight": -0.9519,
+        "raw_value": 0.0,
+        "explanation": "Content-Security-Policy (CSP) actively deployed."
+      },
+      {
+        "feature": "has_x_frame_options",
+        "weight": -0.9393,
+        "raw_value": 0.0,
+        "explanation": "X-Frame-Options configured to prevent clickjacking overlays."
+      },
+      {
+        "feature": "script_reflection_detected",
+        "weight": -0.6377,
+        "raw_value": 0.0,
+        "explanation": "Web server properly sanitizes or escapes dynamic input probes."
+      },
+      {
+        "feature": "has_iframe",
+        "weight": -0.5091,
+        "raw_value": 0.0,
+        "explanation": "Feature 'has_iframe' (value=0.00) increased legitimate score."
+      },
+      {
+        "feature": "cert_valid",
+        "weight": -0.3034,
+        "raw_value": 1.0,
+        "explanation": "Valid TLS certificate verified by trusted root Certificate Authority."
+      }
+    ],
+    "action_recommendation": "BLOCK & QUARANTINE: Webpage exhibits strong indicators of credential harvesting or spoofing."
+  },
+  {
+    "url": "https://portal.chase.com/auth/login?verify=true&session=99281",
+    "verdict": "LEGITIMATE",
+    "phishing_probability": 5.8995111226758855e-05,
+    "abstained": false,
+    "abstention_reason": "High legitimate confidence (p=0.000 <= tau_low=0.35)",
+    "baseline_log_odds": 0.7662,
+    "total_predicted_log_odds": -9.738,
+    "top_risk_signals": [
+      {
+        "feature": "suspicious_keyword_count",
+        "weight": 3.8041,
+        "raw_value": 4.0,
+        "explanation": "URL string contains credential-harvesting or brand impersonation keywords."
+      },
+      {
+        "feature": "has_hidden_inputs",
+        "weight": 3.0651,
+        "raw_value": 0.0,
+        "explanation": "Feature 'has_hidden_inputs' (value=0.00) increased phishing score."
+      },
+      {
+        "feature": "has_csp",
+        "weight": 1.6674,
+        "raw_value": 1.0,
+        "explanation": "Missing Content-Security-Policy (CSP) exposes site to unauthorized script injection."
+      },
+      {
+        "feature": "has_x_frame_options",
+        "weight": 0.9913,
+        "raw_value": 1.0,
+        "explanation": "Missing X-Frame-Options allows page to be framed in clickjacking attacks."
+      },
+      {
+        "feature": "external_script_ratio",
+        "weight": 0.3836,
+        "raw_value": 0.0,
+        "explanation": "High proportion of scripts loaded from foreign third-party domains."
+      }
+    ],
+    "top_trust_signals": [
+      {
+        "feature": "num_query_params",
+        "weight": -5.4133,
+        "raw_value": 2.0,
+        "explanation": "Feature 'num_query_params' (value=2.00) increased legitimate score."
+      },
+      {
+        "feature": "subdomain_count",
+        "weight": -2.9972,
+        "raw_value": 1.0,
+        "explanation": "Standard subdomain hierarchy."
+      },
+      {
+        "feature": "csp_blocks_eval_inline",
+        "weight": -2.7923,
+        "raw_value": 1.0,
+        "explanation": "CSP prohibits unsafe inline scripts and dynamic code evaluation."
+      },
+      {
+        "feature": "cert_longevity_days",
+        "weight": -2.0513,
+        "raw_value": 365.0,
+        "explanation": "Feature 'cert_longevity_days' (value=365.00) increased legitimate score."
+      },
+      {
+        "feature": "x_frame_options_strict",
+        "weight": -1.5265,
+        "raw_value": 1.0,
+        "explanation": "Strict X-Frame-Options (DENY/SAMEORIGIN) enforced."
+      }
+    ],
+    "action_recommendation": "ALLOW ACCESS: Webpage exhibits verified security posture and authentic domain characteristics."
+  },
+  {
+    "url": "https://my-unregistered-hobby-site.org/user/portal",
+    "verdict": "PHISHING",
+    "phishing_probability": 0.9802011863106873,
+    "abstained": false,
+    "abstention_reason": "High phishing confidence (p=0.980 >= tau_high=0.65)",
+    "baseline_log_odds": 0.7662,
+    "total_predicted_log_odds": 3.9021,
+    "top_risk_signals": [
+      {
+        "feature": "has_hidden_inputs",
+        "weight": 3.0651,
+        "raw_value": 0.0,
+        "explanation": "Feature 'has_hidden_inputs' (value=0.00) increased phishing score."
+      },
+      {
+        "feature": "hostname_length",
+        "weight": 2.1592,
+        "raw_value": 30.0,
+        "explanation": "Feature 'hostname_length' (value=30.00) increased phishing score."
+      },
+      {
+        "feature": "subdomain_count",
+        "weight": 1.2674,
+        "raw_value": 0.0,
+        "explanation": "Excessive subdomain nesting used to disguise destination domain."
+      },
+      {
+        "feature": "csp_blocks_eval_inline",
+        "weight": 1.2074,
+        "raw_value": 0.0,
+        "explanation": "CSP permits unsafe-inline or unsafe-eval script execution."
+      },
+      {
+        "feature": "x_frame_options_strict",
+        "weight": 1.12,
+        "raw_value": 0.0,
+        "explanation": "X-Frame-Options is lenient or missing DENY/SAMEORIGIN policy."
+      }
+    ],
+    "top_trust_signals": [
+      {
+        "feature": "suspicious_keyword_count",
+        "weight": -3.7619,
+        "raw_value": 0.0,
+        "explanation": "URL string does not contain suspicious lure keywords."
+      },
+      {
+        "feature": "has_csp",
+        "weight": -0.9519,
+        "raw_value": 0.0,
+        "explanation": "Content-Security-Policy (CSP) actively deployed."
+      },
+      {
+        "feature": "has_x_frame_options",
+        "weight": -0.9393,
+        "raw_value": 0.0,
+        "explanation": "X-Frame-Options configured to prevent clickjacking overlays."
+      },
+      {
+        "feature": "has_x_content_type_options",
+        "weight": -0.666,
+        "raw_value": 1.0,
+        "explanation": "X-Content-Type-Options: nosniff enforced."
+      },
+      {
+        "feature": "script_reflection_detected",
+        "weight": -0.6377,
+        "raw_value": 0.0,
+        "explanation": "Web server properly sanitizes or escapes dynamic input probes."
+      }
+    ],
+    "action_recommendation": "BLOCK & QUARANTINE: Webpage exhibits strong indicators of credential harvesting or spoofing."
+  }
+]

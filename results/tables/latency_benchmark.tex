@@ -1,0 +1,14 @@
+\begin{table}
+\caption{Computational efficiency comparison clearly separating directly measured BEAP performance from published literature figures.}
+\label{tab:latency_benchmark}
+\begin{tabular}{llllll}
+\toprule
+System / Architecture & Measurement Basis & Hardware Environment & Memory Footprint & Reported Total Decision Latency & Throughput \\
+\midrule
+BEAP (Logistic Regression) [This Work] & Directly Measured (1,000 runs) & Intel/AMD x86-64 (Single Core CPU) & < 25 MB RAM & 2.03 ms & 491.7 samples/sec \\
+BEAP (XGBoost + TreeSHAP) [This Work] & Directly Measured (1,000 runs) & Intel/AMD x86-64 (Single Core CPU) & < 30 MB RAM & 6.38 ms & 156.7 samples/sec \\
+Multimodal Graph Fusion (GCN + BERT) [Kavya & Sumathi 2025] & Reported in Literature (IEEE Access [1]) & NVIDIA GPU Accelerator (CUDA) & ~1.8 GB VRAM & 233.50 ms & 4.28 samples/sec \\
+Visual CNN + DOM Transformer [Cova et al. / Prior Art] & Reported in Literature (Prior Art [7]) & NVIDIA GPU / High-end Server CPU & ~850 MB RAM & 372.00 ms & 2.69 samples/sec \\
+\bottomrule
+\end{tabular}
+\end{table}

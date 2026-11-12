@@ -1,0 +1,17 @@
+\begin{table}
+\caption{Granular latency breakdown of the BEAP pipeline stages measured over 1,000 iterations.}
+\label{tab:latency_breakdown}
+\begin{tabular}{lrr}
+\toprule
+Pipeline Stage & Mean Latency (ms) & Share of Total (%) \\
+\midrule
+1. Static URL & HTML Parsing & 0.404000 & 19.900000 \\
+2. Dynamic Header & Cert Parsing & 0.654000 & 32.200000 \\
+3. Feature Scaling & Vectorization & 0.149000 & 7.300000 \\
+4. Classifier Inference (LR) & 0.190000 & 9.300000 \\
+5. Log-Odds Explanation & Report & 0.050000 & 2.500000 \\
+Total Decision Pipeline (LR) & 2.034000 & 100.000000 \\
+Total Decision Pipeline (XGB + TreeSHAP) & 6.381000 & 100.000000 \\
+\bottomrule
+\end{tabular}
+\end{table}

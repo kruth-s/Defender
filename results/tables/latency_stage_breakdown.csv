@@ -1,0 +1,8 @@
+Pipeline Stage,Mean Latency (ms),Share of Total (%)
+1. Static URL & HTML Parsing,0.404,19.9
+2. Dynamic Header & Cert Parsing,0.654,32.2
+3. Feature Scaling & Vectorization,0.149,7.3
+4. Classifier Inference (LR),0.19,9.3
+5. Log-Odds Explanation & Report,0.05,2.5
+Total Decision Pipeline (LR),2.034,100.0
+Total Decision Pipeline (XGB + TreeSHAP),6.381,100.0

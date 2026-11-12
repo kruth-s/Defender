@@ -1,0 +1,26 @@
+\begin{table}
+\caption{Selective Classification performance across uncertainty thresholds.}
+\label{tab:abstention_tradeoff}
+\begin{tabular}{lrlrrrrrr}
+\toprule
+Model & Delta (Margin) & Tau Interval & Coverage (%) & Abstention (%) & Selective Accuracy (%) & Selective Risk (%) & Selective FNR (%) & Selective FPR (%) \\
+\midrule
+Static Baseline & 0.00 & [0.50, 0.50] & 100.00 & 0.00 & 97.45 & 2.55 & 3.89 & 1.19 \\
+BEAP Multimodal & 0.00 & [0.50, 0.50] & 100.00 & 0.00 & 99.22 & 0.78 & 0.78 & 0.79 \\
+Static Baseline & 0.05 & [0.45, 0.55] & 99.41 & 0.59 & 97.44 & 2.56 & 3.92 & 1.19 \\
+BEAP Multimodal & 0.05 & [0.45, 0.55] & 99.61 & 0.39 & 99.21 & 0.79 & 0.78 & 0.79 \\
+Static Baseline & 0.10 & [0.40, 0.60] & 98.63 & 1.37 & 98.01 & 1.99 & 3.54 & 0.40 \\
+BEAP Multimodal & 0.10 & [0.40, 0.60] & 99.41 & 0.59 & 99.21 & 0.79 & 0.78 & 0.79 \\
+Static Baseline & 0.15 & [0.35, 0.65] & 97.84 & 2.16 & 98.20 & 1.80 & 3.19 & 0.40 \\
+BEAP Multimodal & 0.15 & [0.35, 0.65] & 98.63 & 1.37 & 99.60 & 0.40 & 0.79 & 0.00 \\
+Static Baseline & 0.20 & [0.30, 0.70] & 96.08 & 3.92 & 98.57 & 1.43 & 2.42 & 0.41 \\
+BEAP Multimodal & 0.20 & [0.30, 0.70] & 98.63 & 1.37 & 99.60 & 0.40 & 0.79 & 0.00 \\
+Static Baseline & 0.25 & [0.25, 0.75] & 93.92 & 6.08 & 99.16 & 0.84 & 1.22 & 0.43 \\
+BEAP Multimodal & 0.25 & [0.25, 0.75] & 97.84 & 2.16 & 100.00 & 0.00 & 0.00 & 0.00 \\
+Static Baseline & 0.30 & [0.20, 0.80] & 92.94 & 7.06 & 99.16 & 0.84 & 1.23 & 0.43 \\
+BEAP Multimodal & 0.30 & [0.20, 0.80] & 97.06 & 2.94 & 100.00 & 0.00 & 0.00 & 0.00 \\
+Static Baseline & 0.35 & [0.15, 0.85] & 90.78 & 9.22 & 99.78 & 0.22 & 0.42 & 0.00 \\
+BEAP Multimodal & 0.35 & [0.15, 0.85] & 96.27 & 3.73 & 100.00 & 0.00 & 0.00 & 0.00 \\
+\bottomrule
+\end{tabular}
+\end{table}

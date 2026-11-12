@@ -1,0 +1,18 @@
+\begin{table}
+\caption{Ablation analysis across feature modalities under strict domain-disjoint evaluation.}
+\label{tab:ablation}
+\begin{tabular}{llrrrrrrr}
+\toprule
+Modality & Classifier & Accuracy & Precision & Recall & F1-Score & ROC-AUC & PR-AUC & Brier Score \\
+\midrule
+Static URL Only & Logistic Regression & 0.9431 & 0.9351 & 0.9533 & 0.9441 & 0.9943 & 0.9946 & 0.0310 \\
+Static URL Only & XGBoost & 0.9882 & 0.9960 & 0.9805 & 0.9882 & 0.9998 & 0.9998 & 0.0066 \\
+Static URL + HTML & Logistic Regression & 0.9745 & 0.9880 & 0.9611 & 0.9744 & 0.9974 & 0.9976 & 0.0196 \\
+Static URL + HTML & XGBoost & 0.9922 & 0.9961 & 0.9883 & 0.9922 & 0.9999 & 0.9999 & 0.0063 \\
+Dynamic Browser Only & Logistic Regression & 0.9549 & 0.9398 & 0.9728 & 0.9560 & 0.9934 & 0.9936 & 0.0330 \\
+Dynamic Browser Only & XGBoost & 0.9608 & 0.9472 & 0.9767 & 0.9617 & 0.9937 & 0.9932 & 0.0293 \\
+BEAP Multimodal (Proposed) & Logistic Regression & 0.9922 & 0.9922 & 0.9922 & 0.9922 & 0.9998 & 0.9998 & 0.0065 \\
+BEAP Multimodal (Proposed) & XGBoost & 0.9941 & 0.9922 & 0.9961 & 0.9942 & 0.9998 & 0.9998 & 0.0054 \\
+\bottomrule
+\end{tabular}
+\end{table}
