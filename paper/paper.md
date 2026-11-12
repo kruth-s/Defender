@@ -25,6 +25,24 @@ BEAP incorporates four interconnected architectural layers:
 4. **Selective Classification & Complete Explainability Engine (`beap/abstention.py` & `beap/models.py`)**: Evaluates dual thresholds $(\tau_{low}, \tau_{high})$ and generates complete log-odds attributions incorporating baseline expectations:
    $$\text{logit}(P(y=1 \mid \mathbf{x})) = \underbrace{\left(w_0 + \sum_{i=1}^d w_i \bar{x}_i\right)}_{b_0 \text{ (Baseline Log-Odds)}} + \sum_{i=1}^d \underbrace{w_i (x_i - \bar{x}_i)}_{\phi_i(\mathbf{x}) \text{ (Attribution)}}$$
 
+### 1.1 Empirical SSRF Boundary Validation
+
+| Target Category | Candidate Input Target | Resolved Scope | Enforcement Layer | Verdict |
+| :--- | :--- | :--- | :--- | :---: |
+| **Loopback IPv4** | `http://127.0.0.1:8080/admin` | 127.0.0.1 | Pre-flight Host Filter | **BLOCKED** |
+| **Loopback Hostname** | `http://localhost:3000/api` | 127.0.0.1 | DNS Pre-resolution | **BLOCKED** |
+| **Loopback IPv6** | `http://[::1]/status` | ::1 | Host Parser Filter | **BLOCKED** |
+| **Private RFC 1918 (Class A)** | `http://10.0.1.5/internal-auth` | 10.0.1.5 | Subnet Range Validator | **BLOCKED** |
+| **Private RFC 1918 (Class B)** | `http://172.16.5.20/db-admin` | 172.16.5.20 | Subnet Range Validator | **BLOCKED** |
+| **Private RFC 1918 (Class C)** | `http://192.168.1.1/setup.cgi` | 192.168.1.1 | Subnet Range Validator | **BLOCKED** |
+| **Cloud Instance Metadata** | `http://169.254.169.254/latest/` | 169.254.169.254 | Link-Local / Metadata Blacklist | **BLOCKED** |
+| **GCP Cloud Metadata** | `http://metadata.google.internal/` | Metadata Scope | Prohibited Host Filter | **BLOCKED** |
+| **Disallowed Scheme (file)** | `file:///etc/passwd` | Local Filesystem | Scheme Whitelist Guard | **BLOCKED** |
+| **Disallowed Scheme (gopher)** | `gopher://127.0.0.1:6379/_` | Legacy Protocol | Scheme Whitelist Guard | **BLOCKED** |
+| **Unsafe Redirect Cascade** | `https://pub.site/r` &rarr; `192.168.1.50` | 192.168.1.50 | Hop-by-Hop Redirect Check | **BLOCKED** |
+| **Public Benign Domain** | `https://example.com/login` | 93.184.216.34 | Validated Public Host | **ALLOWED** |
+| **Public Secured DNS** | `https://1.1.1.1/dns-query` | 1.1.1.1 | Validated Public Host | **ALLOWED** |
+
 ---
 
 ## 2. Experimental Results (Calibrated Benchmark)
@@ -74,10 +92,44 @@ BEAP incorporates four interconnected architectural layers:
 | Multimodal Graph Fusion [1] | Reported in Lit. (IEEE Access 2025) | 233.50 ms | $\approx$ 1.8 GB VRAM |
 | Visual CNN + Transformer [7] | Reported in Lit. (Prior Art) | 372.00 ms | $\approx$ 850 MB RAM |
 
+### 2.5 Feature-Wise Contribution & Threat Rationale Analysis
+
+| Feature Identifier | Modality | Log-Odds Weight | Impact Direction | Security / Threat Rationale |
+| :--- | :--- | :---: | :---: | :--- |
+| `suspicious_keyword_count` | Static URL | $+2.7127$ | Phishing Risk ($+$) | Presence of credential-harvesting tokens (*login*, *verify*, *auth*). |
+| `cert_longevity_days` | Dynamic Transport | $-2.1606$ | Benign Trust ($-$) | Multi-year certificates characteristic of vetted enterprise domains. |
+| `csp_blocks_eval_inline` | Dynamic Transport | $-1.8361$ | Benign Trust ($-$) | Strict CSP mitigates script injection and credential-harvesting overlays. |
+| `hostname_length` | Static URL | $+1.3782$ | Phishing Risk ($+$) | Extended hostname length typical of deceptive sub-domain masking. |
+| `x_frame_options_strict` | Dynamic Transport | $-1.3075$ | Benign Trust ($-$) | Anti-framing policy (`DENY`/`SAMEORIGIN`) blocks clickjacking lures. |
+| `has_iframe` | Static HTML | $+1.3027$ | Phishing Risk ($+$) | Hidden iframes frequently embed secondary credential harvesting forms. |
+| `script_reflection_detected` | Dynamic Behavioral | $+1.2900$ | Phishing Risk ($+$) | Active probe reflection unmasks client-side parameter tampering. |
+| `has_csp` | Dynamic Transport | $+1.2599$ | Contextual Risk ($+$) | Superficial CSP presence without strict execution boundaries. |
+| `has_ip_address` | Static URL | $+1.1509$ | Phishing Risk ($+$) | Raw IP literals bypass DNS domain reputation mechanisms. |
+| `has_x_frame_options` | Dynamic Transport | $+0.9650$ | Contextual Risk ($+$) | Permissive framing policies often copied by automated cloning kits. |
+| `cert_valid` | Dynamic Transport | $-0.6876$ | Benign Trust ($-$) | Valid cryptographic handshake confirms baseline TLS compliance. |
+| `has_x_content_type_options`| Dynamic Transport | $-0.6770$ | Benign Trust ($-$) | `nosniff` directive blocks MIME-type confusion attacks. |
+| `has_referrer_policy` | Dynamic Transport | $-0.6155$ | Benign Trust ($-$) | Strict referrer controls protect sensitive tokens from leaking. |
+| `hsts_max_age_adequate` | Dynamic Transport | $-0.5205$ | Benign Trust ($-$) | Persistent HSTS headers prevent SSL-stripping downgrades. |
+| `form_action_cross_domain` | Dynamic Behavioral | $+0.1711$ | Phishing Risk ($+$) | Forms transmitting credentials to an unrelated external domain. |
+| `cert_is_free_or_short_lived`| Dynamic Transport | $-0.1771$ | Contextual Neutral | Free automated TLS issuance (Let's Encrypt); contextual signal. |
+| `entropy` | Static URL | $+0.0605$ | Phishing Risk ($+$) | High Shannon entropy characteristic of algorithmically generated domains. |
+
+*Contextual Handling of Free Certificates:* Free automated certificates (Let's Encrypt / ZeroSSL) are treated as contextual signals rather than deterministic phishing indicators. BEAP never blocks a site solely due to a free certificate. Instead, cross-modal conjunction (e.g., cross-domain form action + missing security headers vs. same-domain form action + valid HSTS/CSP) discriminates malicious from legitimate usage, while ambiguous configurations safely trigger selective abstention.
+
 ---
 
-## 3. Threats to Validity and Scope Limitations
+## 3. Operational Deployment & SOC Workload Management
 
-1. **Development Benchmark Scope**: The 2,400-sample benchmark is an offline development dataset. While domain-disjoint and calibrated with realistic overlapping features, it does not substitute for a multi-month in-the-wild longitudinal evaluation.
-2. **Dynamic Transport Scope**: The current pipeline captures HTTP response headers, SSL/TLS handshake metadata, redirect sequences, and form actions. Full headless browser JavaScript rendering (e.g., executing client-side canvas / WebAssembly) represents complementary future work.
-3. **Safety Controls**: Network probing must only target authorized destinations, strictly protected by SSRF boundaries.
+### 3.1 SOC Analyst Workload Management
+At $\delta = 0.25$, BEAP achieves 97.84% automated coverage and defers 2.16% of ambiguous traffic (22 per 1,000 URLs) to SOC analysts. To manage alert volume:
+1. **Risk-Prioritized Queueing:** Abstained cases are sorted by posterior risk divergence $|f(\mathbf{x}) - 0.5|$, immediately escalating borderline threats leaning towards $\tau_{high}$.
+2. **Multi-Tier Severity Triage:** High-urgency cases (active credential fields + cross-domain targets) receive immediate human review; low-urgency edge cases are queued for off-peak inspection.
+3. **Pre-Compiled Diagnostic Dossiers:** Closed-form log-odds attributions and exact session evidence reduce manual triage time from minutes to under 15–30 seconds.
+4. **Safe Deferral Containment:** Deferred cases are never default-allowed; they are placed under provisional isolation (e.g., browser sandbox or cautionary interstitial banner).
+5. **Adaptive Margin Modulation:** Under burst volume, $\delta$ can be dynamically narrowed (e.g., to 0.15), expanding automated coverage to 98.63% while maintaining 99.60% selective accuracy.
+
+### 3.2 Threats to Validity and Scope Limitations
+
+1. **Processing vs. Network Latency Separation:** The 2.03 ms figure represents computational decision pipeline latency (feature vectorization, inference, and log-odds calculation). Active network transport inspection requires socket connections and handshakes, with an unavoidable network latency floor of 0.5–2.0 s.
+2. **Development Benchmark Scope & External Feeds:** The 2,400-sample benchmark is an offline development dataset with domain-disjoint splitting. Ongoing validation against live threat intelligence feeds (e.g., OpenPhish, PhishTank) is essential for longitudinal robustness.
+3. **Safety Controls:** Network probing is strictly protected by pre-flight and hop-by-hop SSRF validation boundaries.
